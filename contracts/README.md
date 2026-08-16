@@ -29,6 +29,12 @@ and limit price stay private until settlement.
 Compact has no native Windows build — this repo compiles it through WSL2:
 
 ```bash
+npm run compile-contract
+```
+
+which wraps (`scripts/compile-contract.mjs`):
+
+```bash
 wsl -d Ubuntu -e bash -lc "cd /mnt/c/Users/dell/Desktop/Midnight && compact compile +0.31.1 contracts/hidden-order.compact contracts/build"
 ```
 
