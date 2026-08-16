@@ -1,0 +1,10 @@
+node_modules/
+*.secret.json
+.env
+.env.*
+!.env.example
+dist/
+build/
+.next/
+*.db
+*.sqlite
