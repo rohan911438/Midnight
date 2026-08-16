@@ -2,11 +2,12 @@
 
 ## Setup (before the room sees anything)
 
-1. `docker start midnight-proof-server-1` — confirm `curl localhost:6300` is healthy.
-2. `cd contracts && wsl -d Ubuntu -e bash -lc "compact compile +0.31.1 hidden-order.compact build"` if the contract changed.
-3. `node scripts/deploy.mjs` — deploys (or reuses, if `CONTRACT_ADDRESS` is already set in `.env`) `hidden-order.compact` on preview. Copy the printed contract address / deploy tx link.
-4. `npm run --prefix backend start` (port 4000).
-5. `npm run --prefix frontend dev` (port 3000).
+1. `docker start midnight-proof-server-1` then `npm run check-proof-server` to confirm it's healthy.
+2. `npm run compile-contract` if the contract changed.
+3. `npm run deploy` — deploys (or reuses, if `CONTRACT_ADDRESS` is already set in `.env`) `hidden-order.compact` on preview. Copy the printed contract address / deploy tx link. See `docs/troubleshooting.md` if this hangs.
+4. `npm run backend` (port 4000).
+5. `npm run frontend` (port 3000).
+6. `npm run reset-demo` between run-throughs to clear the order book.
 
 ## The pitch (30 seconds)
 
