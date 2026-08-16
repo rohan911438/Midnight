@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import db from '../db.mjs';
 import * as contractClient from '../midnight/contractClient.mjs';
+import { assertValidOrderSubmission, assertValidMatchPair, assertValidSettlement } from './validation.mjs';
 
 function httpError(statusCode, message) {
   const err = new Error(message);
@@ -19,10 +20,7 @@ function httpError(statusCode, message) {
 const pendingSecrets = new Map();
 
 export async function submitOrder({ walletAddress, side, tokenPair, amount, limitPrice }) {
-  if (!walletAddress) throw httpError(400, 'walletAddress is required');
-  if (side !== 'BUY' && side !== 'SELL') throw httpError(400, 'side must be BUY or SELL');
-  if (!(amount > 0)) throw httpError(400, 'amount must be positive');
-  if (!(limitPrice > 0)) throw httpError(400, 'limitPrice must be positive');
+  assertValidOrderSubmission({ walletAddress, side, amount, limitPrice });
 
   const secretKey = contractClient.randomSecretKey();
   const { orderId, commitment, txHash } = await contractClient.submitOrder({ side, amount, limitPrice, secretKey });
@@ -60,15 +58,7 @@ export function listMatches() {
 export async function matchOrders({ buyOrderId, sellOrderId }) {
   const buy = pendingSecrets.get(buyOrderId);
   const sell = pendingSecrets.get(sellOrderId);
-  if (!buy || !sell) {
-    throw httpError(
-      400,
-      'Both orders must have been submitted in this backend session to be matched in this demo (their private terms live only in server memory, never on disk)'
-    );
-  }
-  if (buy.side !== 'BUY' || sell.side !== 'SELL') {
-    throw httpError(400, 'buyOrderId must be a BUY order and sellOrderId must be a SELL order');
-  }
+  assertValidMatchPair(buy, sell);
 
   const { txHash } = await contractClient.matchOrders({ buyOrderId, sellOrderId, buy, sell });
 
@@ -92,12 +82,7 @@ export async function settleMatch({ matchId, executedAmount, executedPrice }) {
   const sell = pendingSecrets.get(match.sell_order_id);
   if (!buy || !sell) throw httpError(500, 'Missing in-memory order terms for this match (server restarted?)');
 
-  if (!(executedAmount > 0) || executedAmount > buy.amount || executedAmount > sell.amount) {
-    throw httpError(400, 'executedAmount must be positive and not exceed either order size');
-  }
-  if (executedPrice > buy.limitPrice || executedPrice < sell.limitPrice) {
-    throw httpError(400, "executedPrice must be within both orders' limit prices");
-  }
+  assertValidSettlement({ executedAmount, executedPrice, buy, sell });
 
   const { settlementId, txHash } = await contractClient.settle({
     buyOrderId: match.buy_order_id,

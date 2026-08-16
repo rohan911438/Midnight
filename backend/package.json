@@ -6,7 +6,8 @@
   "description": "Local Node/Express API orchestrating Private Swap order submission, matching, and settlement on Midnight preview network",
   "scripts": {
     "start": "node src/server.mjs",
-    "dev": "node --watch src/server.mjs"
+    "dev": "node --watch src/server.mjs",
+    "test": "node --test"
   },
   "dependencies": {
     "@midnight-ntwrk/compact-runtime": "^0.16.0",
