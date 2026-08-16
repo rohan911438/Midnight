@@ -4,17 +4,28 @@ import type { Order } from '@/lib/api';
 
 export function OrderList({
   orders,
+  loading,
   selectedBuyId,
   selectedSellId,
   onSelectBuy,
   onSelectSell,
 }: {
   orders: Order[];
+  loading: boolean;
   selectedBuyId: string | null;
   selectedSellId: string | null;
   onSelectBuy: (id: string) => void;
   onSelectSell: (id: string) => void;
 }) {
+  if (loading) {
+    return (
+      <div className="card">
+        <p className="card-title">Order book (hidden)</p>
+        <p className="muted">Loading…</p>
+      </div>
+    );
+  }
+
   if (orders.length === 0) {
     return (
       <div className="card">

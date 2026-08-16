@@ -11,6 +11,7 @@ import { BeforeAfterPanel } from '@/components/BeforeAfterPanel';
 export default function Home() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
   const [buyOrderId, setBuyOrderId] = useState<string | null>(null);
   const [sellOrderId, setSellOrderId] = useState<string | null>(null);
   const [activeMatch, setActiveMatch] = useState<MatchRecord | null>(null);
@@ -20,6 +21,8 @@ export default function Home() {
       setOrders(await api.listOrders());
     } catch {
       // backend not reachable yet -- fine, user hasn't started it
+    } finally {
+      setOrdersLoading(false);
     }
   }
 
@@ -44,6 +47,7 @@ export default function Home() {
           <div style={{ height: 20 }} />
           <OrderList
             orders={orders}
+            loading={ordersLoading}
             selectedBuyId={buyOrderId}
             selectedSellId={sellOrderId}
             onSelectBuy={setBuyOrderId}
