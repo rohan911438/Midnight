@@ -62,6 +62,12 @@ export async function getWallet() {
     indexerClientConnection: {
       indexerHttpUrl: cfg.indexerHttpUrl,
       indexerWsUrl: cfg.indexerWsUrl,
+      // Without this, long-lived subscriptions (needed while proving/
+      // submitting, unlike the quick single-shot balance check) may sit
+      // idle long enough for Blockfrost to close them; the SDK's handling
+      // of that reconnect is one working theory for the Wallet.Sync loop
+      // documented in project memory (private-swap-deploy-blocker).
+      keepAlive: 15000,
     },
     txHistoryStorage: new NoOpTransactionHistoryStorage(),
     relayURL: new URL(cfg.relayUrl),
