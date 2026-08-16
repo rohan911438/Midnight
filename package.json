@@ -12,6 +12,7 @@
     "check-balance": "node wallet/check-balance.mjs",
     "compile-contract": "node scripts/compile-contract.mjs",
     "deploy": "node scripts/deploy.mjs",
+    "reset-demo": "node scripts/reset-demo.mjs",
     "backend": "npm run start --prefix backend",
     "frontend": "npm run dev --prefix frontend"
   },
