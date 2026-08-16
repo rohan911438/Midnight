@@ -20,9 +20,9 @@ only the trade that actually executed.
 contracts/   hidden-order.compact -- submitOrder / matchOrders / settle circuits
 backend/     Node/Express API + SQLite, orchestrates proof generation and tx submission
 frontend/    Next.js swap UI: commit -> match -> settle -> before/after reveal
-scripts/     deploy.mjs -- deploys the compiled contract to preview
-wallet/      generate-wallet.mjs -- derives a preview-network signer
-docs/        demo-script.md
+scripts/     compile-contract.mjs, deploy.mjs, reset-demo.mjs, check-proof-server.mjs
+wallet/      generate-wallet.mjs, check-balance.mjs
+docs/        demo-script.md, architecture.md, troubleshooting.md
 ```
 
 ## Running locally
@@ -30,18 +30,19 @@ docs/        demo-script.md
 ```bash
 # 1. Proof server (Docker)
 docker start midnight-proof-server-1   # or: docker run -d -p 6300:6300 --name midnight-proof-server-1 midnightntwrk/proof-server:8.0.3
+npm run check-proof-server
 
 # 2. Compile the contract (Compact has no native Windows build -- via WSL2)
-wsl -d Ubuntu -e bash -lc "cd /mnt/c/Users/dell/Desktop/Midnight && compact compile +0.31.1 contracts/hidden-order.compact contracts/build"
+npm run compile-contract
 
 # 3. Deploy to preview
-node scripts/deploy.mjs
+npm run deploy
 
 # 4. Backend
-npm run --prefix backend start
+npm run backend
 
 # 5. Frontend
-npm run --prefix frontend dev
+npm run frontend
 ```
 
 Config lives in `.env` (gitignored -- copy `.env.example` and fill in your own
