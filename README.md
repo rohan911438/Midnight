@@ -56,18 +56,31 @@ one matched order pair, test tokens only, no mainnet.
 | Preview wallet | Generated and funded (5000 tNight) |
 | Local proof server | Running, healthy (`localhost:6300`) |
 | Backend (Express + SQLite) | Boots, routes work, verified with curl |
-| Frontend (Next.js) | Complete, not yet exercised in a browser |
-| `scripts/deploy.mjs` | **Blocked** -- wallet sync against the preview network hangs; not a bug in this repo's code, see below |
+| Frontend (Next.js) | Builds and typechecks cleanly, not yet exercised in a browser |
+| Wallet balance check (`wallet/check-balance.mjs`) | **Works** -- confirms the funded 5000 tNight |
+| `scripts/deploy.mjs` (full facade) | **Blocked** -- see below |
 
-`scripts/deploy.mjs`'s `contractClient.mjs`/`wallet.mjs` are written and
-verified against the actual installed `@midnight-ntwrk/midnight-js-contracts`
-/ `wallet-sdk-facade` type signatures (not guessed) -- but running it hits a
-live-network issue: Blockfrost's preview Node RPC closes the WebSocket
-immediately (`1006 Abnormal Closure`); switching `MIDNIGHT_RPC` to
-`wss://rpc.preview.midnight.network` (Midnight's own public node, verified
-working via a raw `ws` connectivity test) fixes that but exposes a second,
-different issue -- `facade.waitForSyncedState()` never resolves, looping on
-`Wallet.Sync` errors after a normal-close `subscribeRuntimeVersion`
-disconnect. Next steps: check for newer `wallet-sdk-facade`/`wallet-sdk-*`
-versions, or try starting the shielded/unshielded/Dust sub-wallets one at a
-time instead of concurrently via `WalletFacade.init`.
+Two real, distinct bugs found and fixed along the way (not guesses -- each
+diagnosed with a raw `ws` connectivity test and confirmed by an SDK source
+read):
+
+1. Blockfrost's preview Node RPC closes the WebSocket immediately (`1006
+   Abnormal Closure`) -- fixed by pointing `MIDNIGHT_RPC` at Midnight's own
+   public node, `wss://rpc.preview.midnight.network` (~4.5s to respond,
+   verified working).
+2. The wallet SDK's indexer config has no auth field at all -- `project_id`
+   has to be embedded as a `?project_id=` query param directly on
+   `MIDNIGHT_INDEXER_HTTP`/`MIDNIGHT_INDEXER_WS`, or the sync subscription
+   connects (handshake succeeds) but gets silently rejected, surfacing only
+   as an opaque `Wallet.Sync: [object ErrorEvent]`. Confirmed fixed for the
+   standalone `UnshieldedWallet` path -- `check-balance.mjs` now resolves
+   instantly.
+
+With both fixes applied, `scripts/deploy.mjs`'s full `WalletFacade`
+(shielded+unshielded+Dust together) gets measurably further -- no more
+*immediate* failure, ~9 minutes of clean silence before failing, vs.
+seconds before -- but still eventually hits the same `Wallet.Sync` error
+from the unshielded sub-wallet's sync specifically. Not diagnosed further
+this session; see [[private-swap-deploy-blocker]] in project memory for the
+full timeline and next steps (isolating which sub-wallet's subscription is
+still at fault, checking for newer `wallet-sdk-*` versions).

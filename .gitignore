@@ -11,3 +11,4 @@ contracts/build/
 *.sqlite
 backend/data/
 .claude/
+*.log
