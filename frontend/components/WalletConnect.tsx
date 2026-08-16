@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { connectLaceWallet, hasInjectedWallet } from '@/lib/wallet';
+import { connectLaceWallet, hasInjectedWallet, isValidPreviewAddress } from '@/lib/wallet';
 
 export function WalletConnect({ address, onConnect }: { address: string | null; onConnect: (addr: string) => void }) {
   const [manual, setManual] = useState('');
@@ -48,8 +48,17 @@ export function WalletConnect({ address, onConnect }: { address: string | null; 
           value={manual}
           onChange={(e) => setManual(e.target.value)}
         />
+        {manual && !isValidPreviewAddress(manual) && (
+          <span style={{ fontSize: 12, color: 'var(--sell)' }}>
+            Doesn&apos;t look like a preview address (expected mn_addr_preview1...)
+          </span>
+        )}
       </div>
-      <button className="btn btn-secondary" disabled={!manual} onClick={() => onConnect(manual)}>
+      <button
+        className="btn btn-secondary"
+        disabled={!isValidPreviewAddress(manual)}
+        onClick={() => onConnect(manual.trim())}
+      >
         Use this address
       </button>
     </div>
