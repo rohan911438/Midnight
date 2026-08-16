@@ -1,0 +1,202 @@
+// Private Swap - hidden order book on Midnight (preview network)
+//
+// Orders are committed with their amount/limit price kept as private witness
+// inputs; only a commitment hash and status ever touch public ledger state.
+// Matching proves price-compatibility inside the circuit without disclosing
+// either side's private inputs. Settlement discloses only the trade that
+// actually executed (final amount + price), never the original order terms.
+
+pragma language_version >= 0.20;
+
+import CompactStandardLibrary;
+
+export enum Side { BUY, SELL }
+export enum OrderStatus { COMMITTED, MATCHED, SETTLED }
+
+export struct OrderCommitment {
+  commitment: Bytes<32>;
+  owner: Bytes<32>;
+  side: Side;
+  status: OrderStatus;
+}
+
+export struct Settlement {
+  buyOrderId: Bytes<32>;
+  sellOrderId: Bytes<32>;
+  executedAmount: Uint<64>;
+  executedPrice: Uint<64>;
+  settledAt: Field;
+}
+
+export ledger orders: Map<Bytes<32>, OrderCommitment>;
+export ledger settlements: Map<Bytes<32>, Settlement>;
+export ledger orderSeq: Counter;
+export ledger settlementSeq: Counter;
+
+// Order owner's local key -- proves ownership on takedown/match without a
+// persistent public identity.
+witness localSecretKey(): Bytes<32>;
+
+// Private order terms, supplied when submitting an order.
+witness orderAmount(): Uint<64>;
+witness orderLimitPrice(): Uint<64>;
+
+// Supplied by whichever party assembles the match/settle transaction (the
+// demo's manual "match now" trigger). Both sides' terms are needed in the
+// same witness context to prove compatibility, but neither ever reaches the
+// ledger -- only the commitment-equality checks and the final disclosed
+// trade do.
+witness matchBuySecret(): Bytes<32>;
+witness matchBuyAmount(): Uint<64>;
+witness matchBuyLimitPrice(): Uint<64>;
+witness matchSellSecret(): Bytes<32>;
+witness matchSellAmount(): Uint<64>;
+witness matchSellLimitPrice(): Uint<64>;
+witness executedAmount(): Uint<64>;
+witness executedPrice(): Uint<64>;
+
+circuit ownerKey(secretKey: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "swap:owner:"), secretKey]);
+}
+
+circuit orderCommit(amount: Uint<64>, limitPrice: Uint<64>, secretKey: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([
+    pad(32, "swap:order:"),
+    amount as Field as Bytes<32>,
+    limitPrice as Field as Bytes<32>,
+    secretKey
+  ]);
+}
+
+// Commits a hidden order: amount + limit price never leave this circuit as
+// plaintext -- only their commitment hash and the (public) side are stored.
+export circuit submitOrder(side: Side): Bytes<32> {
+  // `side` is a caller-supplied circuit argument, so the compiler treats it
+  // as potentially witness-sourced until explicitly disclosed. It is
+  // genuinely meant to be public (buy/sell is not hidden, only amount/price
+  // are), so disclosing it here is intentional, not a privacy leak.
+  const publicSide = disclose(side);
+
+  assert(orderAmount() > 0, "Order amount must be positive");
+  assert(orderLimitPrice() > 0, "Limit price must be positive");
+
+  orderSeq.increment(1);
+  const orderId = disclose(persistentHash<Vector<3, Bytes<32>>>([
+    pad(32, "swap:id:"),
+    orderSeq as Field as Bytes<32>,
+    localSecretKey()
+  ]));
+  assert(!orders.member(orderId), "Order id collision");
+
+  const commitment = disclose(orderCommit(orderAmount(), orderLimitPrice(), localSecretKey()));
+  const owner = disclose(ownerKey(localSecretKey()));
+
+  orders.insert(orderId, OrderCommitment {
+    commitment: commitment,
+    owner: owner,
+    side: publicSide,
+    status: OrderStatus.COMMITTED
+  });
+
+  return orderId;
+}
+
+// Proves a committed buy order and a committed sell order are price
+// compatible, without disclosing either order's amount or limit price.
+// Only the resulting COMMITTED -> MATCHED status transition is public.
+export circuit matchOrders(buyOrderId: Bytes<32>, sellOrderId: Bytes<32>): [] {
+  // Order ids are public (returned by submitOrder), but are still
+  // caller-supplied circuit arguments -- disclose them explicitly before
+  // any ledger operation touches them.
+  const buyId = disclose(buyOrderId);
+  const sellId = disclose(sellOrderId);
+
+  assert(orders.member(buyId), "Unknown buy order");
+  assert(orders.member(sellId), "Unknown sell order");
+
+  const buyOrder = orders.lookup(buyId);
+  const sellOrder = orders.lookup(sellId);
+  assert(buyOrder.status == OrderStatus.COMMITTED, "Buy order not open");
+  assert(sellOrder.status == OrderStatus.COMMITTED, "Sell order not open");
+  assert(buyOrder.side == Side.BUY, "buyOrderId is not a buy order");
+  assert(sellOrder.side == Side.SELL, "sellOrderId is not a sell order");
+
+  // Reconstruct each order's commitment from the witnessed terms -- this is
+  // what proves the matcher actually knows the real (private) order
+  // contents, without those contents ever becoming part of the transcript.
+  assert(
+    buyOrder.commitment == orderCommit(matchBuyAmount(), matchBuyLimitPrice(), matchBuySecret()),
+    "Buy order terms do not match its commitment"
+  );
+  assert(
+    sellOrder.commitment == orderCommit(matchSellAmount(), matchSellLimitPrice(), matchSellSecret()),
+    "Sell order terms do not match its commitment"
+  );
+
+  // The actual price-compatibility check. This comparison happens entirely
+  // inside the circuit -- the two limit prices are never written to state.
+  assert(matchBuyLimitPrice() >= matchSellLimitPrice(), "Buy limit is below sell limit: no match");
+
+  orders.insert(buyId, OrderCommitment {
+    commitment: buyOrder.commitment,
+    owner: buyOrder.owner,
+    side: buyOrder.side,
+    status: OrderStatus.MATCHED
+  });
+  orders.insert(sellId, OrderCommitment {
+    commitment: sellOrder.commitment,
+    owner: sellOrder.owner,
+    side: sellOrder.side,
+    status: OrderStatus.MATCHED
+  });
+}
+
+// Settles a matched pair, disclosing only the trade that actually executed.
+// The executed amount/price are bounded by both parties' original private
+// terms (re-supplied here as witnesses) but the original terms themselves
+// are never written anywhere.
+export circuit settle(buyOrderId: Bytes<32>, sellOrderId: Bytes<32>): Bytes<32> {
+  const buyId = disclose(buyOrderId);
+  const sellId = disclose(sellOrderId);
+
+  const buyOrder = orders.lookup(buyId);
+  const sellOrder = orders.lookup(sellId);
+  assert(buyOrder.status == OrderStatus.MATCHED, "Buy order not matched");
+  assert(sellOrder.status == OrderStatus.MATCHED, "Sell order not matched");
+
+  assert(executedAmount() > 0, "Executed amount must be positive");
+  assert(executedAmount() <= matchBuyAmount(), "Executed amount exceeds buy order size");
+  assert(executedAmount() <= matchSellAmount(), "Executed amount exceeds sell order size");
+  assert(executedPrice() <= matchBuyLimitPrice(), "Executed price above buyer's limit");
+  assert(executedPrice() >= matchSellLimitPrice(), "Executed price below seller's limit");
+
+  settlementSeq.increment(1);
+  const settlementId = disclose(persistentHash<Vector<3, Bytes<32>>>([
+    pad(32, "swap:settle:"),
+    settlementSeq as Field as Bytes<32>,
+    buyOrderId
+  ]));
+
+  settlements.insert(settlementId, Settlement {
+    buyOrderId: buyId,
+    sellOrderId: sellId,
+    executedAmount: disclose(executedAmount()),
+    executedPrice: disclose(executedPrice()),
+    settledAt: settlementSeq as Field
+  });
+
+  orders.insert(buyId, OrderCommitment {
+    commitment: buyOrder.commitment,
+    owner: buyOrder.owner,
+    side: buyOrder.side,
+    status: OrderStatus.SETTLED
+  });
+  orders.insert(sellId, OrderCommitment {
+    commitment: sellOrder.commitment,
+    owner: sellOrder.owner,
+    side: sellOrder.side,
+    status: OrderStatus.SETTLED
+  });
+
+  return settlementId;
+}

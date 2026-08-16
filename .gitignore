@@ -5,6 +5,8 @@ node_modules/
 !.env.example
 dist/
 build/
+contracts/build/
 .next/
 *.db
 *.sqlite
+backend/data/
