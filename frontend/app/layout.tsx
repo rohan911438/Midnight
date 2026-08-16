@@ -4,6 +4,16 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Private Swap — Midnight',
   description: 'Front-running-resistant token swap on Midnight preview network',
+  openGraph: {
+    title: 'Private Swap — Midnight',
+    description: 'Front-running-resistant token swap on Midnight preview network',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Private Swap — Midnight',
+    description: 'Front-running-resistant token swap on Midnight preview network',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
