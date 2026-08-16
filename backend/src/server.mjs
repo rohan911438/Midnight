@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import ordersRouter from './routes/orders.mjs';
 import matchesRouter from './routes/matches.mjs';
+import db from './db.mjs';
 
 // Root .env (one level above backend/) holds the shared preview-network
 // config used by both this server and scripts/deploy.mjs.
@@ -42,6 +43,18 @@ app.use((err, _req, res, _next) => {
 });
 
 const port = Number(process.env.BACKEND_PORT ?? 4000);
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Private Swap backend listening on http://localhost:${port} (network: ${process.env.NETWORK ?? 'preview'})`);
 });
+
+// Closes the SQLite file handle cleanly so scripts/reset-demo.mjs (or a
+// plain restart) doesn't hit Windows' EPERM-on-open-file the moment
+// afterward -- verified against that exact failure mode this session.
+function shutdown() {
+  server.close(() => {
+    db.close();
+    process.exit(0);
+  });
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
