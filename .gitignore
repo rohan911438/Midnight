@@ -10,3 +10,4 @@ contracts/build/
 *.db
 *.sqlite
 backend/data/
+.claude/
