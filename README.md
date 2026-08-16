@@ -58,29 +58,12 @@ one matched order pair, test tokens only, no mainnet.
 | Backend (Express + SQLite) | Boots, routes work, verified with curl |
 | Frontend (Next.js) | Builds and typechecks cleanly, not yet exercised in a browser |
 | Wallet balance check (`wallet/check-balance.mjs`) | **Works** -- confirms the funded 5000 tNight |
-| `scripts/deploy.mjs` (full facade) | **Blocked** -- see below |
+| `scripts/deploy.mjs` (full facade) | **Blocked** -- see [`docs/troubleshooting.md`](docs/troubleshooting.md) |
 
-Two real, distinct bugs found and fixed along the way (not guesses -- each
-diagnosed with a raw `ws` connectivity test and confirmed by an SDK source
-read):
-
-1. Blockfrost's preview Node RPC closes the WebSocket immediately (`1006
-   Abnormal Closure`) -- fixed by pointing `MIDNIGHT_RPC` at Midnight's own
-   public node, `wss://rpc.preview.midnight.network` (~4.5s to respond,
-   verified working).
-2. The wallet SDK's indexer config has no auth field at all -- `project_id`
-   has to be embedded as a `?project_id=` query param directly on
-   `MIDNIGHT_INDEXER_HTTP`/`MIDNIGHT_INDEXER_WS`, or the sync subscription
-   connects (handshake succeeds) but gets silently rejected, surfacing only
-   as an opaque `Wallet.Sync: [object ErrorEvent]`. Confirmed fixed for the
-   standalone `UnshieldedWallet` path -- `check-balance.mjs` now resolves
-   instantly.
-
-With both fixes applied, `scripts/deploy.mjs`'s full `WalletFacade`
-(shielded+unshielded+Dust together) gets measurably further -- no more
-*immediate* failure, ~9 minutes of clean silence before failing, vs.
-seconds before -- but still eventually hits the same `Wallet.Sync` error
-from the unshielded sub-wallet's sync specifically. Not diagnosed further
-this session; see [[private-swap-deploy-blocker]] in project memory for the
-full timeline and next steps (isolating which sub-wallet's subscription is
-still at fault, checking for newer `wallet-sdk-*` versions).
+Two real, distinct SDK/config bugs were found and fixed along the way (a
+broken Blockfrost RPC endpoint, and a completely unauthenticated indexer
+subscription) -- both diagnosed with raw `ws` connectivity tests rather than
+guessed, and both confirmed working for the read-only wallet path
+(`wallet/check-balance.mjs`). The full deploy still hits one further,
+undiagnosed sync issue. Full investigation, what's ruled out, and next
+steps are in [`docs/troubleshooting.md`](docs/troubleshooting.md).
