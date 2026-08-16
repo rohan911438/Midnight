@@ -1,0 +1,16 @@
+{
+  "name": "private-swap-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local Node/Express API orchestrating Private Swap order submission, matching, and settlement on Midnight preview network",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "dev": "node --watch src/server.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1"
+  }
+}
