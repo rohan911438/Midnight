@@ -10,6 +10,7 @@
   "scripts": {
     "generate-wallet": "node wallet/generate-wallet.mjs",
     "check-balance": "node wallet/check-balance.mjs",
+    "check-proof-server": "node scripts/check-proof-server.mjs",
     "compile-contract": "node scripts/compile-contract.mjs",
     "deploy": "node scripts/deploy.mjs",
     "reset-demo": "node scripts/reset-demo.mjs",
