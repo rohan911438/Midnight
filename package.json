@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Private Swap - front-running-resistant token swap on Midnight (preview network)",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "generate-wallet": "node wallet/generate-wallet.mjs",
     "deploy": "node scripts/deploy.mjs",
