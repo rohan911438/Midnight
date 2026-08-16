@@ -3,6 +3,8 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import ordersRouter from './routes/orders.mjs';
 import matchesRouter from './routes/matches.mjs';
 
@@ -11,8 +13,21 @@ import matchesRouter from './routes/matches.mjs';
 dotenv.config({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '.env') });
 
 const app = express();
+app.use(helmet());
 app.use(cors());
 app.use(express.json());
+
+// Order/match submission triggers real proof generation -- cheap to abuse
+// otherwise. Generous enough for a live demo, tight enough to matter.
+app.use(
+  '/api/',
+  rateLimit({
+    windowMs: 60_000,
+    limit: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, network: process.env.NETWORK ?? 'preview' });
