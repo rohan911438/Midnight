@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "description": "Private Swap - front-running-resistant token swap on Midnight (preview network)",
+  "scripts": {
+    "generate-wallet": "node wallet/generate-wallet.mjs",
+    "deploy": "node scripts/deploy.mjs",
+    "backend": "npm run start --prefix backend",
+    "frontend": "npm run dev --prefix frontend"
+  },
   "dependencies": {
     "@midnight-ntwrk/compact-runtime": "^0.16.0",
     "@midnight-ntwrk/wallet-sdk-abstractions": "^2.1.0",
