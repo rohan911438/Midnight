@@ -3,10 +3,13 @@ node_modules/
 .env
 .env.*
 !.env.example
+!frontend/.env.example
 dist/
 build/
-contracts/build/
+!contracts/build/
 .next/
+frontend/public/keys/
+frontend/public/zkir/
 *.db
 *.sqlite
 backend/data/
