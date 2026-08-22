@@ -13,7 +13,10 @@ export function BeforeAfterPanel({ match, onSettled }: { match: MatchRecord | nu
     return (
       <div className="card">
         <p className="card-title">Before / after</p>
-        <p className="muted">Match two orders above to see the hidden commitment next to the revealed settlement.</p>
+        <div className="empty-state">
+          <div className="empty-icon">⇄</div>
+          <p className="muted">Match two orders above to see the hidden commitment next to the revealed settlement.</p>
+        </div>
       </div>
     );
   }

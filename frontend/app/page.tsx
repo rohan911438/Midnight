@@ -8,6 +8,7 @@ import { SwapForm } from '@/components/SwapForm';
 import { OrderList } from '@/components/OrderList';
 import { MatchPanel } from '@/components/MatchPanel';
 import { BeforeAfterPanel } from '@/components/BeforeAfterPanel';
+import { StepTracker, type StepKey } from '@/components/StepTracker';
 
 export default function Home() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -34,8 +35,24 @@ export default function Home() {
     return () => clearInterval(id);
   }, []);
 
+  const done: StepKey[] = [];
+  if (orders.length > 0) done.push('commit');
+  if (activeMatch) done.push('match');
+  if (activeMatch?.status === 'SETTLED') { done.push('settle'); done.push('reveal'); }
+  const current: StepKey = !activeMatch ? (orders.length > 0 ? 'match' : 'commit') : activeMatch.status === 'SETTLED' ? 'reveal' : 'settle';
+
   return (
     <main>
+      <section className="hero">
+        <h1>Trade without leaking your intent</h1>
+        <p>
+          Private Swap commits your order&apos;s amount and limit price as a zero-knowledge commitment on Midnight —
+          nothing an observer of the mempool can front-run. Two orders match and settle without either side&apos;s
+          terms ever touching the public ledger; only the trade that actually executed is revealed.
+        </p>
+        <StepTracker current={current} done={done} />
+      </section>
+
       <WalletConnect
         address={walletAddress}
         onConnect={(addr) => {

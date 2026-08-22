@@ -21,7 +21,15 @@ export function OrderList({
     return (
       <div className="card">
         <p className="card-title">Order book (hidden)</p>
-        <p className="muted">Loading…</p>
+        <p className="card-subtitle">Amount and limit price never leave the circuit — only a commitment hash is public.</p>
+        {[0, 1].map((i) => (
+          <div key={i} className="order-row">
+            <div style={{ width: '100%' }}>
+              <div className="skeleton" style={{ width: 90, height: 18, marginBottom: 8 }} />
+              <div className="skeleton" style={{ width: '60%', height: 14 }} />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
@@ -30,7 +38,11 @@ export function OrderList({
     return (
       <div className="card">
         <p className="card-title">Order book (hidden)</p>
-        <p className="muted">No orders committed yet. Submit one above to see it appear here, still hidden.</p>
+        <p className="card-subtitle">Amount and limit price never leave the circuit — only a commitment hash is public.</p>
+        <div className="empty-state">
+          <div className="empty-icon">◇</div>
+          <p className="muted">No orders committed yet. Submit one above to see it appear here, still hidden.</p>
+        </div>
       </div>
     );
   }
@@ -38,9 +50,11 @@ export function OrderList({
   return (
     <div className="card">
       <p className="card-title">Order book (hidden)</p>
+      <p className="card-subtitle">Amount and limit price never leave the circuit — only a commitment hash is public.</p>
       {orders.map((order) => (
         <div className="order-row" key={order.id}>
           <div>
+            <span className={`side-tag ${order.side}`}>{order.side}</span>
             <span className={`status-badge ${order.status}`}>{order.status}</span>
             <div className="hash" style={{ marginTop: 6 }}>
               {order.id.slice(0, 18)}… · commitment {order.commitment_hash.slice(0, 12)}…

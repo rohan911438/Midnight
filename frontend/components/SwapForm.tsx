@@ -69,6 +69,11 @@ export function SwapForm({
   return (
     <form className="card" onSubmit={handleSubmit}>
       <p className="card-title">Submit hidden order</p>
+      <p className="card-subtitle">
+        {laceConnected
+          ? 'Proven and signed in this browser via your connected Lace wallet.'
+          : 'Amount and limit price stay private witnesses — only a commitment hash reaches the ledger.'}
+      </p>
       {error && <div className="error-banner">{error}</div>}
 
       <div className="side-toggle">
@@ -82,11 +87,11 @@ export function SwapForm({
 
       <div className="field">
         <label>Token pair</label>
-        <input value="tDUST / tNIGHT" disabled />
+        <div className="token-pair-badge">tDUST ⇄ tNIGHT</div>
       </div>
 
       <div className="field">
-        <label>Amount (private)</label>
+        <label>🔒 Amount (private)</label>
         <input
           type="number"
           min="1"
@@ -98,7 +103,7 @@ export function SwapForm({
       </div>
 
       <div className="field">
-        <label>Limit price (private)</label>
+        <label>🔒 Limit price (private)</label>
         <input
           type="number"
           min="1"

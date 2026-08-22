@@ -32,11 +32,16 @@ export function MatchPanel({
   return (
     <div className="card">
       <p className="card-title">Match now</p>
-      {error && <div className="error-banner">{error}</div>}
-      <p className="muted" style={{ marginBottom: 16 }}>
+      <p className="card-subtitle">
         Pick one committed buy order and one committed sell order above, then trigger the match. Price compatibility
         is proven on-chain without revealing either side&apos;s amount or limit price.
       </p>
+      {error && <div className="error-banner">{error}</div>}
+      {(buyOrderId || sellOrderId) && !(buyOrderId && sellOrderId) && (
+        <div className="info-banner">
+          {buyOrderId ? 'Buy order picked — now pick a sell order above.' : 'Sell order picked — now pick a buy order above.'}
+        </div>
+      )}
       <button className="btn" disabled={!buyOrderId || !sellOrderId || matching} onClick={handleMatch}>
         {matching ? 'Proving match…' : 'Match selected orders'}
       </button>

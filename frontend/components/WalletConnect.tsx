@@ -1,7 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { connectLaceWallet, hasInjectedWallet, isValidPreviewAddress } from '@/lib/wallet';
+import { connectLaceWallet, hasInjectedWallet, isValidPreviewAddress, isWalletConnected } from '@/lib/wallet';
+
+function truncate(address: string): string {
+  return address.length > 24 ? `${address.slice(0, 14)}…${address.slice(-8)}` : address;
+}
 
 export function WalletConnect({
   address,
@@ -15,6 +19,15 @@ export function WalletConnect({
   const [manual, setManual] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    if (!address) return;
+    navigator.clipboard.writeText(address).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
 
   async function handleConnect() {
     setConnecting(true);
@@ -36,9 +49,22 @@ export function WalletConnect({
   if (address) {
     return (
       <div className="card">
-        <p className="card-title">Wallet</p>
-        <p className="hash">{address}</p>
-        <button className="btn btn-secondary" style={{ marginTop: 12 }} onClick={onDisconnect}>
+        <p className="card-title">
+          Wallet
+          {isWalletConnected() && <span className="side-tag BUY">LACE</span>}
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span className="hash" title={address}>{truncate(address)}</span>
+          <button className="copy-btn" onClick={handleCopy} title="Copy full address">
+            {copied ? 'copied ✓' : 'copy'}
+          </button>
+        </div>
+        {isWalletConnected() && (
+          <p className="muted" style={{ marginTop: 10 }}>
+            Circuit proving and signing happen in this browser, through Lace — not on the backend.
+          </p>
+        )}
+        <button className="btn btn-secondary" style={{ marginTop: 14 }} onClick={onDisconnect}>
           Disconnect
         </button>
       </div>
@@ -48,6 +74,11 @@ export function WalletConnect({
   return (
     <div className="card">
       <p className="card-title">Wallet</p>
+      <p className="card-subtitle">
+        {hasInjectedWallet()
+          ? 'Connect Lace to prove and sign orders yourself, right in this browser.'
+          : "No Lace extension detected — you can still explore the demo with a manually entered address, or install Lace for the full private, browser-side flow."}
+      </p>
       {error && <div className="error-banner">{error}</div>}
       <button className="btn" onClick={handleConnect} disabled={connecting}>
         {connecting ? 'Connecting…' : hasInjectedWallet() ? 'Connect Lace Wallet' : 'Connect Wallet'}
