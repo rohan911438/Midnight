@@ -37,7 +37,15 @@ async function main() {
   console.log('Wrote CONTRACT_ADDRESS to .env.');
 }
 
-main().catch((err) => {
-  console.error('Deploy failed:', err);
-  process.exitCode = 1;
-});
+main()
+  .catch((err) => {
+    console.error('Deploy failed:', err);
+    process.exitCode = 1;
+  })
+  .finally(() => {
+    // The wallet facade leaves its indexer/node WebSocket connections open,
+    // so without an explicit exit the process hangs indefinitely after a
+    // failed deploy instead of returning control (and a nonzero exit code)
+    // to the caller.
+    process.exit(process.exitCode ?? 0);
+  });
