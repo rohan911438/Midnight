@@ -38,8 +38,11 @@ which wraps (`scripts/compile-contract.mjs`):
 wsl -d Ubuntu -e bash -lc "cd /mnt/c/Users/dell/Desktop/Midnight && compact compile +0.31.1 contracts/hidden-order.compact contracts/build"
 ```
 
-Output goes to `contracts/build/` (gitignored — regenerate rather than
-commit): `contract/index.js` (the generated JS/TS contract module used by
-the backend and deploy script), and `keys/` + `zkir/` per circuit (prover
-key, verifier key, ZK IR) consumed by the local proof server at
-`localhost:6300`.
+Output goes to `contracts/build/` (committed to this repo so the compile
+output can be verified without a WSL2 toolchain -- regenerate and commit
+again after changing the contract): `contract/index.js` (the generated
+JS/TS contract module used by the backend and deploy script, and by
+`frontend/lib/contract.ts` for browser-side circuit calls), and `keys/` +
+`zkir/` per circuit (prover key, verifier key, ZK IR) consumed by the local
+proof server at `localhost:6300`, and copied into `frontend/public/` at
+build time (`scripts/sync-frontend-zk-assets.mjs`) for the browser to fetch.

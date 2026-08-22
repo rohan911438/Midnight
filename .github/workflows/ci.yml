@@ -13,7 +13,14 @@ jobs:
       - name: Install Compact toolchain
         run: |
           curl --proto '=https' --tlsv1.2 -LsSf https://github.com/midnightntwrk/compact/releases/latest/download/compact-installer.sh | sh
-          echo "$HOME/.compact/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Install Compact language version 0.31.1
+        # `compact compile +VERSION` selects an already-installed toolchain
+        # version -- it does not fetch it on demand. Without this step the
+        # compile fails with "Couldn't find compiler for
+        # x86_64-unknown-linux-musl (0.31.1)" (confirmed by reproducing this
+        # job's steps locally).
+        run: compact update 0.31.1
       - name: Compile hidden-order.compact
         run: compact compile +0.31.1 contracts/hidden-order.compact contracts/build
 
