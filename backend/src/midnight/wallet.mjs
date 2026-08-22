@@ -72,6 +72,12 @@ export async function getWallet() {
     txHistoryStorage: new NoOpTransactionHistoryStorage(),
     relayURL: new URL(cfg.relayUrl),
     provingServerUrl: new URL(cfg.proofServerUrl),
+    // Required by the Dust wallet's fee calculation (TransactingCapabilityImplementation.calculateFee),
+    // undocumented default. ledger-v8's own doc comment on feesWithMargin warns
+    // this value is used as an *exponent* in the fee formula, so keep it small --
+    // 2 gives a couple of blocks' worth of safety margin without risking a
+    // blown-up fee estimate.
+    costParameters: { feeBlocksMargin: 2, additionalFeeOverhead: 0n },
   };
 
   console.log('[wallet] connecting shielded/unshielded/Dust sub-wallets to the preview indexer…');
@@ -85,11 +91,60 @@ export async function getWallet() {
   await facade.start(shieldedSecretKeys, dustSecretKey);
 
   console.log('[wallet] waiting for sync (this can take a while against Blockfrost preview)…');
-  await facade.waitForSyncedState();
+  // NOT facade.waitForSyncedState(): that requires an *exact* match
+  // (allowedGap = 0n) between each sub-wallet's last-applied index and the
+  // indexer's current position. For unshielded specifically, "applied" only
+  // advances on transactions that touch this wallet -- for a low-activity
+  // demo wallet, its one funding tx's sequence number will essentially
+  // never exactly equal the live network's current scan position, so that
+  // check can never be satisfied even though the wallet is, in every
+  // practical sense, fully caught up. Confirmed empirically: with
+  // diagnostic logging, all three subscriptions reach the live tip
+  // (processed event id == the indexer's reported maxId) and then just
+  // idle on real-time trickle -- exact-match sync simply never fires.
+  // A generous gap tolerance is the correct fix, not a hack around a
+  // healthy wait -- see docs/troubleshooting.md and project memory
+  // (private-swap-deploy-blocker) for the full diagnosis.
+  const SYNC_GAP = 1_000_000n;
+  const SYNC_TIMEOUT_MS = 5 * 60 * 1000;
+  await Promise.race([
+    Promise.all([
+      facade.shielded.waitForSyncedState(SYNC_GAP),
+      facade.unshielded.waitForSyncedState(SYNC_GAP),
+      facade.dust.waitForSyncedState(SYNC_GAP),
+    ]),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Wallet sync did not reach isConnected within ${SYNC_TIMEOUT_MS}ms`)), SYNC_TIMEOUT_MS)
+    ),
+  ]);
   console.log('[wallet] synced.');
 
   started = { facade, shieldedSecretKeys, dustSecretKey, unshieldedKeystore };
   return started;
+}
+
+// The Node RPC client used for submission (@polkadot/api's WsProvider) is
+// created once when the facade starts and kept for the process's lifetime.
+// By the time a transaction is actually ready to submit -- after sync,
+// building, and (for proof-requiring transactions) proving, which together
+// can take minutes -- that connection has often gone stale and the specific
+// in-flight submitAndWatchExtrinsic subscription fails outright rather than
+// surviving reconnect. The transaction itself is already fully built at
+// this point, so retrying just the submission call (not the whole
+// sync+build+prove pipeline) is cheap and is the correct fix, confirmed by
+// repeated failures at this exact step -- see docs/troubleshooting.md.
+export async function submitWithRetry(facade, finalizedTx, attempts = 5, delayMs = 3000) {
+  let lastErr;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await facade.submitTransaction(finalizedTx);
+    } catch (err) {
+      lastErr = err;
+      console.log(`[wallet] submit attempt ${i}/${attempts} failed (${err?.message ?? err}), retrying…`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastErr;
 }
 
 export function defaultTtl() {

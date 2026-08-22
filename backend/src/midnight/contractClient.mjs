@@ -9,6 +9,7 @@
 // `privateStateProvider.set(...)` immediately before invoking the circuit.
 import { randomBytes } from 'node:crypto';
 import { WebSocket } from 'ws';
+import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
@@ -16,8 +17,12 @@ import { deployContract, findDeployedContract } from '@midnight-ntwrk/midnight-j
 import * as CompiledContractModule from '@midnight-ntwrk/compact-js/effect/CompiledContract';
 import { Contract, Side, ledger as decodeLedger } from '../../../contracts/build/contract/index.js';
 import { createInMemoryPrivateStateProvider } from './privateStateProvider.mjs';
-import { getWallet, defaultTtl } from './wallet.mjs';
+import { getWallet, defaultTtl, submitWithRetry } from './wallet.mjs';
 import * as cfg from './config.mjs';
+
+// midnight-js-contracts reads this global rather than taking it as a
+// parameter -- must be set before deployContract/findDeployedContract run.
+setNetworkId(cfg.networkId);
 
 const witnesses = {
   localSecretKey: (ctx) => [ctx.privateState, ctx.privateState.secretKey],
@@ -63,7 +68,7 @@ async function getProviders() {
     };
 
     const midnightProvider = {
-      submitTx: (tx) => facade.submitTransaction(tx),
+      submitTx: (tx) => submitWithRetry(facade, tx),
     };
 
     return { privateStateProvider, publicDataProvider, zkConfigProvider, proofProvider, walletProvider, midnightProvider };
