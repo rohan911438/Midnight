@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api, type Order, type MatchRecord } from '@/lib/api';
+import { isWalletConnected, disconnectWallet } from '@/lib/wallet';
 import { WalletConnect } from '@/components/WalletConnect';
 import { SwapForm } from '@/components/SwapForm';
 import { OrderList } from '@/components/OrderList';
@@ -10,6 +11,7 @@ import { BeforeAfterPanel } from '@/components/BeforeAfterPanel';
 
 export default function Home() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [laceConnected, setLaceConnected] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [buyOrderId, setBuyOrderId] = useState<string | null>(null);
@@ -34,13 +36,25 @@ export default function Home() {
 
   return (
     <main>
-      <WalletConnect address={walletAddress} onConnect={setWalletAddress} />
+      <WalletConnect
+        address={walletAddress}
+        onConnect={(addr) => {
+          setWalletAddress(addr);
+          setLaceConnected(isWalletConnected());
+        }}
+        onDisconnect={() => {
+          disconnectWallet();
+          setWalletAddress(null);
+          setLaceConnected(false);
+        }}
+      />
 
       {walletAddress && (
         <>
           <div style={{ height: 20 }} />
           <SwapForm
             walletAddress={walletAddress}
+            laceConnected={laceConnected}
             onSubmitted={(order) => setOrders((prev) => [order, ...prev])}
           />
 

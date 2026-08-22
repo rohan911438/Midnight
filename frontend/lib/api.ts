@@ -46,6 +46,20 @@ export const api = {
   getOrder: (id: string) => request<Order>(`/orders/${id}`),
   submitOrder: (body: { walletAddress: string; side: 'BUY' | 'SELL'; tokenPair: string; amount: string; limitPrice: string }) =>
     request<Order>('/orders', { method: 'POST', body: JSON.stringify(body) }),
+  // Records an order whose submitOrder circuit already ran client-side
+  // (see lib/contract.ts) -- the backend persists it for the order book /
+  // matching flow instead of re-submitting it.
+  recordOrder: (body: {
+    walletAddress: string;
+    side: 'BUY' | 'SELL';
+    tokenPair: string;
+    amount: string;
+    limitPrice: string;
+    orderId: string;
+    commitment: string;
+    txHash: string;
+    secretKeyHex: string;
+  }) => request<Order>('/orders/record', { method: 'POST', body: JSON.stringify(body) }),
   listMatches: () => request<MatchRecord[]>('/matches'),
   matchOrders: (buyOrderId: string, sellOrderId: string) =>
     request<MatchRecord>('/matches', { method: 'POST', body: JSON.stringify({ buyOrderId, sellOrderId }) }),
