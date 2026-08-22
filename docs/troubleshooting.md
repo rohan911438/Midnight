@@ -3,11 +3,72 @@
 `scripts/deploy.mjs` builds a full `WalletFacade` (shielded + unshielded +
 Dust sub-wallets) via `@midnight-ntwrk/wallet-sdk-facade`, then deploys
 `hidden-order.compact` through it. As of this writing that deploy is
-**blocked** on a wallet-sync issue -- everything else in this repo (the
-contract itself, the backend, the frontend, wallet generation, balance
-checking) is built and verified working.
+**blocked** -- everything else in this repo (the contract itself, the
+backend, the frontend, wallet generation, balance checking) is built and
+verified working; deploy is one command (`npm run deploy`) away from
+succeeding the moment the blocker below clears.
 
-## Two real bugs found and fixed
+## Current blocker (2026-08-23): Dust never generates for this wallet
+
+Deploying (and any other fee-paying transaction) requires DUST, which is
+generated automatically over time for NIGHT UTXOs registered via
+`scripts/register-dust.mjs`. Full diagnosis:
+
+1. **Registration genuinely succeeded on-chain.** `npm run check-dust`
+   confirms the funded Night UTXO's own metadata says
+   `registeredForDustGeneration: true` (registered 2026-08-17). An earlier
+   session had wrongly concluded registration itself was failing, based on
+   the specific tx hash `submitWithRetry` happened to log not being found
+   by the indexer -- misleading, since `submitWithRetry` retries the whole
+   build-and-submit cycle, so an *earlier* attempt's tx (not the logged
+   one) is what actually landed.
+2. **Per Midnight's own docs** (`docs.midnight.network/concepts/dust-architecture`),
+   a registered NIGHT UTXO should generate DUST at ~827 billion Specks/sec
+   per 100 NIGHT, reaching its 5-DUST-per-NIGHT cap in ~1 week. This wallet
+   (5000 NIGHT, registered 6 days ago as of this writing) should be close to
+   fully capped -- far more than enough to cover a deploy's fee.
+3. **Actual balance is still exactly zero.** `npm run check-dust` reports
+   `totalCoins: 0`, `balance: 0n`. Deploy fails with
+   `Wallet.InsufficientFunds: Insufficient Funds: could not balance dust`
+   (`[DIAG] InsufficientFunds: tokenType=dust needed=-1 availableCoins=[]`).
+4. **Root cause narrowed to the Dust sub-wallet's sync, not our fee-balancing
+   code.** `scripts/diag-dust-strict-sync.mjs` drives `facade.dust.waitForSyncedState()`
+   with its default *exact* gap (not the tolerant `SYNC_GAP` this repo's
+   `wallet.mjs` otherwise applies) directly, after the facade has already
+   reached its gap-tolerant "synced" state. It never resolves (tested up to
+   4 extra minutes) -- the Dust sub-wallet's sync against the preview
+   indexer never converges, independent of our own gap-tolerance patch (so
+   that patch is not masking this; exact sync doesn't complete either way).
+   This points at either the Dust generation-tree subscription itself being
+   broken against Blockfrost's preview indexer, or DUST generation not
+   actually being processed server-side for this registration despite the
+   UTXO being flagged as registered.
+
+## Next steps for whoever picks this up
+
+1. Re-run `npm run check-dust` periodically -- if this is purely a
+   registration-processing delay rather than a broken subscription, balance
+   should eventually appear.
+2. Try `scripts/diag-dust-strict-sync.mjs` again with a longer timeout, and
+   with `keepAlive` tuned on the indexer WS connection, to rule out a
+   connection-level timeout rather than a genuine stuck sync.
+3. File this with Midnight's SDK/forum (`forum.midnight.network`) --
+   `Wallet.Sync: [object ErrorEvent]` recurs constantly in the background
+   even after gap-tolerant "sync" is reached (see below), and the Dust
+   sub-wallet specifically never reaches exact sync; this looks like a
+   genuine upstream bug rather than anything fixable from application code.
+4. Consider whether **preprod** (rather than preview) is the more actively
+   supported network right now -- Midnight's own official
+   `midnightntwrk/example-zkloan` reference dApp targets preprod, not
+   preview, and its Lace-wallet gate explicitly tells users to switch to
+   preprod. Preview may be a lower-priority/legacy network. Switching would
+   mean a fresh wallet, a new preprod faucet request, and a new Blockfrost
+   preprod project (or Midnight's own preprod indexer directly) -- a
+   meaningful redo, not attempted here.
+
+## Older, resolved issues
+
+### Two real bugs found and fixed
 
 **1. Blockfrost's preview Node RPC is broken as a wallet relay.**
 `wss://rpc.midnight-preview.blockfrost.io` closes the WebSocket immediately
@@ -43,43 +104,22 @@ MIDNIGHT_INDEXER_WS=wss://midnight-preview.blockfrost.io/api/v0/ws?project_id=<i
 `node wallet/check-balance.mjs` resolves in under 2 seconds and correctly
 reports the funded balance.
 
-## What's still broken
+### The `Wallet.Sync: [object ErrorEvent]` retry loop -- worked around
 
-With both fixes applied, `scripts/deploy.mjs`'s full `WalletFacade` gets
-much further -- no more immediate failure -- but still eventually hits the
-identical `Wallet.Sync: [object ErrorEvent]` from
-`wallet-sdk-unshielded-wallet/dist/v1/Sync.js`, after anywhere from ~9 to
-~18 minutes of otherwise-clean operation (timing varied between runs, which
-points at something time/state-dependent rather than a deterministic config
-error). `docker logs midnight-proof-server-1` confirms the proof server
-never receives a single request in either case -- the failure is entirely
-confined to the sync phase, before proving ever starts.
+With both fixes above applied, the full `WalletFacade` used to eventually
+hit `Wallet.Sync: [object ErrorEvent]` from each sub-wallet's `Sync.js`
+after 9-18 minutes and never recover, because `facade.waitForSyncedState()`
+requires an *exact* match (`allowedGap = 0n`) between each sub-wallet's
+last-applied index and the indexer's current position -- a bar a
+low-activity wallet's sync can effectively never clear, even though
+diagnostic logging showed every subscription actually reaching the live
+chain tip and just idling on real-time trickle after that.
 
-Ruled out: an indexer-connection idle timeout (`keepAlive: 15000` delayed
-the failure from ~9 to ~18 minutes but didn't prevent it).
-
-## Next steps for whoever picks this up
-
-1. Instrument `wallet-sdk-unshielded-wallet`'s `Sync.js` locally (it's
-   plain JS in `node_modules`, easy to add temporary logging around line 39)
-   to see what the underlying `ErrorEvent` actually contains -- the SDK's
-   own wrapping discards the useful detail.
-2. Try running the full facade with Shielded and Dust stubbed out, to check
-   whether Unshielded-alone survives longer inside a long-running process
-   (as opposed to the short-lived `check-balance.mjs` script, which always
-   succeeds).
-3. Check for newer `@midnight-ntwrk/wallet-sdk-facade` / `wallet-sdk-*`
-   versions -- this repo pins the current stable line (facade 4.0.1,
-   unshielded-wallet 3.1.0, shielded 3.0.1, dust-wallet 4.1.0); a 5.x beta
-   line exists and may include a fix, but wasn't tried here as it would
-   also require bumping `midnight-js-contracts` off its stable 4.1.1 and
-   re-verifying compatibility.
-4. Search Midnight's Discord/forum/GitHub issues for `Wallet.Sync` +
-   `ErrorEvent` -- the genericness of the error message suggests this may
-   already be a known, reported issue.
-
-Everything needed to resume is already wired up correctly: `contracts/`
-compiles, `wallet/` has a funded signer, the local proof server is healthy,
-and `backend/src/midnight/{config,wallet,contractClient}.mjs` are written
-against the real, verified SDK type signatures -- this is a live-network
-sync issue to debug, not application code to rewrite.
+**Fix (now in `backend/src/midnight/wallet.mjs`):** wait on each
+sub-wallet's own `waitForSyncedState(gap)` with a generous gap tolerance
+(`1_000_000n`) instead of the combined facade's exact-match wait. The
+background `Wallet.Sync: [object ErrorEvent]` messages still print
+constantly (harmless -- they're the same real-time-trickle retries as
+before, just no longer gating "synced"), but `[wallet] synced.` now reliably
+fires within seconds instead of never. This is what unblocked getting far
+enough to hit the Dust-generation issue documented above.
