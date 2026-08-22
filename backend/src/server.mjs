@@ -42,7 +42,9 @@ app.use((err, _req, res, _next) => {
   res.status(err.statusCode ?? 500).json({ error: err.message ?? 'Internal error' });
 });
 
-const port = Number(process.env.BACKEND_PORT ?? 4000);
+// Render (and most PaaS hosts) inject PORT and require the app to listen on
+// it; BACKEND_PORT stays the local-dev override from .env.
+const port = Number(process.env.BACKEND_PORT ?? process.env.PORT ?? 4000);
 const server = app.listen(port, () => {
   console.log(`Private Swap backend listening on http://localhost:${port} (network: ${process.env.NETWORK ?? 'preview'})`);
 });
