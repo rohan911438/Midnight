@@ -3,7 +3,15 @@
 import { useState } from 'react';
 import { connectLaceWallet, hasInjectedWallet, isValidPreviewAddress } from '@/lib/wallet';
 
-export function WalletConnect({ address, onConnect }: { address: string | null; onConnect: (addr: string) => void }) {
+export function WalletConnect({
+  address,
+  onConnect,
+  onDisconnect,
+}: {
+  address: string | null;
+  onConnect: (addr: string) => void;
+  onDisconnect: () => void;
+}) {
   const [manual, setManual] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +38,9 @@ export function WalletConnect({ address, onConnect }: { address: string | null; 
       <div className="card">
         <p className="card-title">Wallet</p>
         <p className="hash">{address}</p>
+        <button className="btn btn-secondary" style={{ marginTop: 12 }} onClick={onDisconnect}>
+          Disconnect
+        </button>
       </div>
     );
   }
