@@ -7,6 +7,14 @@
   "engines": {
     "node": ">=24.0.0"
   },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "overrides": {
+    "@midnight-ntwrk/ledger-v8": "8.1.0",
+    "@midnight-ntwrk/onchain-runtime-v3": "3.0.0"
+  },
   "scripts": {
     "generate-wallet": "node wallet/generate-wallet.mjs",
     "check-balance": "node wallet/check-balance.mjs",
@@ -14,6 +22,9 @@
     "compile-contract": "node scripts/compile-contract.mjs",
     "deploy": "node scripts/deploy.mjs",
     "reset-demo": "node scripts/reset-demo.mjs",
+    "check-dust": "node scripts/check-dust.mjs",
+    "register-dust": "node scripts/register-dust.mjs",
+    "sync-frontend-zk-assets": "node scripts/sync-frontend-zk-assets.mjs",
     "backend": "npm run start --prefix backend",
     "frontend": "npm run dev --prefix frontend"
   },
