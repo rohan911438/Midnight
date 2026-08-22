@@ -68,7 +68,17 @@ are committed to this repo so the circuit compilation output can be
 verified without re-running the WSL2 toolchain -- see
 [`contracts/README.md`](contracts/README.md).
 
-**Live demo:** not yet deployed -- see [Status](#status).
+**Live demo:**
+
+- Frontend: **https://private-swap-frontend.vercel.app**
+- Backend API: **https://private-swap-backend.onrender.com** (`/api/health`),
+  also reachable through the frontend's own `/api/*` proxy
+- Wallet connect (Lace, via `@midnight-ntwrk/dapp-connector-api`) and the
+  browser-side `submitOrder` circuit path (`frontend/lib/contract.ts`) are
+  both live; submitting will fail until `NEXT_PUBLIC_CONTRACT_ADDRESS` is
+  set post-deploy (see above)
+- Backend is on Render's free tier -- the first request after a period of
+  inactivity may take ~30-60s to respond while the instance spins back up
 
 ## Status
 
