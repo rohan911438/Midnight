@@ -35,6 +35,30 @@ export async function submitOrder({ walletAddress, side, tokenPair, amount, limi
   return getOrder(orderId);
 }
 
+// Records an order whose submitOrder circuit was already proven, signed,
+// and submitted client-side (frontend/lib/contract.ts), driven by the
+// user's own connected Lace wallet rather than this backend's signer. Same
+// storage shape as submitOrder() above -- this is the same trust model
+// (this backend still needs each order's private terms in memory to build
+// matchOrders/settle proofs later), just with contractClient never touching
+// the private key material because the browser did the circuit call.
+export function recordSubmittedOrder({ walletAddress, side, tokenPair, amount, limitPrice, orderId, commitment, txHash, secretKeyHex }) {
+  assertValidOrderSubmission({ walletAddress, side, amount, limitPrice });
+  if (!orderId || !commitment || !txHash || !secretKeyHex) {
+    throw httpError(400, 'orderId, commitment, txHash, and secretKeyHex are required');
+  }
+
+  const secretKey = Uint8Array.from(Buffer.from(secretKeyHex, 'hex'));
+  pendingSecrets.set(orderId, { secretKey, amount, limitPrice, side });
+
+  db.prepare(
+    `INSERT INTO orders (id, wallet_address, side, token_pair, commitment_hash, status, submit_tx_hash)
+     VALUES (?, ?, ?, ?, ?, 'COMMITTED', ?)`
+  ).run(orderId, walletAddress, side, tokenPair ?? 'tDUST/tNIGHT', commitment, txHash);
+
+  return getOrder(orderId);
+}
+
 export function getOrder(id) {
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
   if (!order) throw httpError(404, 'Order not found');
